@@ -28,6 +28,12 @@ This file is the persistent development memory for AI-assisted coding sessions.
 - **Decision:** All detection engines must inherit from `BaseDetector`, operate deterministically without AI dependencies, and utilize named, documented regex patterns with explicit confidence levels. Each generated `Finding` must include explicit forensic evidence, technical impact, and business risk explanations. Detection logic must evaluate canonical (URL-decoded) inputs to mitigate obfuscation.
 - **Reason:** Satisfies core portfolio principles: explainability, offline testability, deterministic detection before AI enrichment, and executive-ready risk communication.
 
+### ADR-005 — Dynamic Contextual Risk Scoring Engine
+- **Status:** Accepted
+- **Date:** 2026-09-09
+- **Decision:** Risk scores are computed deterministically on a 0-100 scale using three transparent dimensions: Inherent Threat Severity (0-50 pts), Detection Confidence (0-30 pts), and HTTP Response Outcome (0-20 pts). Successful server responses (HTTP 200) escalate risk heavily (+20), server crashes/errors add +15, while client/boundary blocks (403/401) add +5, and non-existent targets (404) add 0 pts.
+- **Reason:** Reflects real-world SOC triage priorities where executed payloads on live endpoints require urgent response, while blocked/failed attempts on non-existent routes represent lower operational threat.
+
 ---
 
 ## Session History
@@ -116,3 +122,26 @@ This file is the persistent development memory for AI-assisted coding sessions.
   - CLI runner orchestrating parser -> detectors not yet implemented.
 - **Next Recommended Task:**
   - Implement stateful Brute Force detector (`detection/brute_force.py`) tracking failed authentication attempts across time windows.
+
+### 2026-09-09 — Session 05: Dynamic Risk Evaluator Engine
+- **Session Goal:** Implement `src/soc_analyst/risk/evaluator.py` to calculate transparent, 0-100 dynamic risk scores evaluating finding severity, confidence, and contextual HTTP status codes (200 OK vs 403 vs 404).
+- **Work Completed:**
+  - Created `RiskAssessment` frozen dataclass and `RiskEvaluator` class in `src/soc_analyst/risk/evaluator.py`.
+  - Implemented 3-factor scoring formula:
+    - Inherent Severity: CRITICAL (50 pts), HIGH (40 pts), MEDIUM (25 pts), LOW (10 pts).
+    - Detection Confidence: HIGH (30 pts), MEDIUM (20 pts), LOW (10 pts).
+    - HTTP Status Outcome: 2xx (+20 pts), 5xx (+15 pts), 3xx (+10 pts), 401/403 (+5 pts), 404 (0 pts), Neutral/Unknown (+5 pts).
+  - Implemented `calculate_score`, `evaluate`, and `evaluate_all` (with descending risk score sorting).
+  - Created `src/soc_analyst/risk/__init__.py` exposing evaluator models and functions.
+  - Created comprehensive test suite in `tests/test_risk_evaluator.py` (10 test cases) verifying status code sensitivity (200 > 500 > 403 > 404), severity ordering, confidence ordering, boundary clamping (0-100), and immutability.
+- **Files Created/Modified:**
+  - `src/soc_analyst/risk/evaluator.py` (created)
+  - `src/soc_analyst/risk/__init__.py` (created)
+  - `tests/test_risk_evaluator.py` (created)
+  - `.ai/LOGS.md` (updated)
+- **Tests Performed:**
+  - Ran `pytest -v` (62 passed in 0.08s: 10 Risk Evaluator tests, 16 SQLi tests, 14 XSS tests, 18 parser tests, 4 model tests).
+- **Known Limitations:**
+  - Gemini AI enrichment layer and Rich reporting CLI not yet connected to RiskEvaluator.
+- **Next Recommended Task:**
+  - Implement Brute Force detector (`detection/brute_force.py`) or wire detection + risk evaluation pipeline into CLI.
