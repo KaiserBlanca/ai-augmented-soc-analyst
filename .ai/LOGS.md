@@ -34,6 +34,12 @@ This file is the persistent development memory for AI-assisted coding sessions.
 - **Decision:** Risk scores are computed deterministically on a 0-100 scale using three transparent dimensions: Inherent Threat Severity (0-50 pts), Detection Confidence (0-30 pts), and HTTP Response Outcome (0-20 pts). Successful server responses (HTTP 200) escalate risk heavily (+20), server crashes/errors add +15, while client/boundary blocks (403/401) add +5, and non-existent targets (404) add 0 pts.
 - **Reason:** Reflects real-world SOC triage priorities where executed payloads on live endpoints require urgent response, while blocked/failed attempts on non-existent routes represent lower operational threat.
 
+### ADR-006 — Gemini AI Threat Enrichment Architecture & Graceful Fallback
+- **Status:** Accepted
+- **Date:** 2026-09-09
+- **Decision:** High-risk findings are enriched using Google Gemini (`gemini-2.5-flash` via official `google-genai` SDK) strictly after local detection and scoring. Structured prompts enforce data-minimization (no raw log dumps or private tokens). AI responses produce Executive Summary, Root Cause Analysis, and Remediation Playbook. In the event of missing keys, quota depletion, or network drops, a deterministic fallback analysis is generated without raising exceptions.
+- **Reason:** Ensures the tool is robust, privacy-conscious, and compliant with portfolio and security standards (Rules 9, 10, 11, 12, 23).
+
 ---
 
 ## Session History
@@ -145,3 +151,28 @@ This file is the persistent development memory for AI-assisted coding sessions.
   - Gemini AI enrichment layer and Rich reporting CLI not yet connected to RiskEvaluator.
 - **Next Recommended Task:**
   - Implement Brute Force detector (`detection/brute_force.py`) or wire detection + risk evaluation pipeline into CLI.
+
+### 2026-09-09 — Session 06: Gemini AI Threat Enrichment & Graceful Fallback
+- **Session Goal:** Implement `src/soc_analyst/ai/enricher.py` utilizing official `google-genai` SDK and `gemini-2.5-flash` model, read `GEMINI_API_KEY` via `python-dotenv`, craft data-minimized structured prompt, generate 3-part SOC analysis (Executive Summary, Root Cause Analysis, Remediation Playbook), and provide deterministic local fallback on missing key or API quota errors with mocked unit tests.
+- **Work Completed:**
+  - Installed `google-genai` (v2.22.0) and `python-dotenv` (v1.2.3).
+  - Created `src/soc_analyst/ai/enricher.py` containing `GeminiEnricher` and `EnrichmentResult`.
+  - Formulated structured prompt with telemetry data minimization (no bulk raw logs or private tokens).
+  - Engineered 3-part SOC analysis response parser (`_parse_ai_response`) and deterministic fallback generator (`_generate_fallback_enrichment`).
+  - Added robust exception handling for `google.genai.errors.APIError` (e.g. 429 quota exhaustion), network timeouts, and missing credentials without crashing the pipeline.
+  - Implemented `enrich_finding` to immutably populate `finding.ai_enrichment`.
+  - Created `src/soc_analyst/ai/__init__.py` and `.env.example`.
+  - Created `tests/test_ai_enricher.py` (9 test cases) using `unittest.mock` for offline testing of successful responses, prompt construction, section parsing, missing API key fallback, quota errors, and network timeouts.
+- **Files Created/Modified:**
+  - `src/soc_analyst/ai/enricher.py` (created)
+  - `src/soc_analyst/ai/__init__.py` (created)
+  - `tests/test_ai_enricher.py` (created)
+  - `.env.example` (created)
+  - `.ai/LOGS.md` (updated)
+- **Tests Performed:**
+  - Ran `pytest -v` (71 passed in 0.36s: 9 AI enricher tests, 10 Risk evaluator tests, 16 SQLi tests, 14 XSS tests, 18 parser tests, 4 model tests).
+- **Known Limitations:**
+  - Stateful Brute Force detector not yet implemented.
+  - CLI runner not yet implemented to connect all components into a user command.
+- **Next Recommended Task:**
+  - Implement stateful Brute Force detector (`detection/brute_force.py`) or implement end-to-end CLI orchestrator (`cli.py`).
